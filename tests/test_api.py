@@ -85,3 +85,31 @@ def test_modele_absent_renvoie_503():
     with TestClient(app) as client:
         state.pop("predictor", None)  # on simule un modèle non chargé
         assert post(client).status_code == 503
+
+
+# ---------------------------------------------------------------------------
+# Tests personnels (bloc 6.3)
+# ---------------------------------------------------------------------------
+
+def test_heure_24_refusee():
+    with TestClient(app) as client:
+        # 24 n'existe pas : refus par le schéma
+        assert post(client, heure_depart=24).status_code == 422
+        # Garde-fou contre le "faux vert" : 23 (la borne haute valide) doit passer.
+        # Sans cette ligne, le test serait vert même avec un schéma qui refuse tout.
+        assert post(client, heure_depart=23).status_code == 200
+
+
+def test_alerte_coherente_avec_le_seuil():
+    facile = dict(distance_km=5, poids_kg=3, heure_depart=11, pluie_mm=0,
+                  trafic_index=1, nb_arrets=0, type_vehicule="moto")
+    with TestClient(app) as client:
+        difficile = post(client).json()          # la livraison VALIDE : trajet difficile
+        simple = post(client, **facile).json()   # trajet très facile
+
+        assert difficile["alerte"] is True
+        assert simple["alerte"] is False
+
+        # L'alerte doit être cohérente avec le seuil renvoyé par l'API
+        assert difficile["probabilite_retard"] >= difficile["seuil"]
+        assert simple["probabilite_retard"] < simple["seuil"]

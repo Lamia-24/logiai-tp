@@ -34,8 +34,15 @@ def health():
 
 @app.post("/v1/predict", response_model=PredictionOut)
 def predict(livraison: Livraison):
-    # À VOUS :
-    # 1. récupérer le predictor dans state (state.get("predictor"))
-    # 2. s'il est absent : lever HTTPException avec le code 503 et un message utile
-    # 3. sinon : renvoyer PredictionOut(**predictor.predict(livraison.model_dump()))
-    raise NotImplementedError("predict() n'est pas encore écrite")
+    # 1. récupérer le predictor chargé au démarrage (None si le modèle manque)
+    predictor = state.get("predictor")
+
+    # 2. modèle absent : 503 = service indisponible (ce n'est ni la faute du client, ni un bug)
+    if predictor is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Modèle non chargé : lancez 'python -m logiai.train' puis relancez le serveur.",
+        )
+
+    # 3. sinon : prédiction (livraison est déjà validée par le schéma)
+    return PredictionOut(**predictor.predict(livraison.model_dump()))
